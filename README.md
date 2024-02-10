@@ -8,5 +8,8 @@ Key Features:
 - Risk Mitigation: Borrowers benefit from a grace period for loan repayment, enhancing flexibility and reducing the risk of penalties.
 - User-Friendly: Liquidi5 prioritizes user experience, offering a seamless borrowing process within the ICP NFT ecosystem.
 
+Proof of Concept - Minimum Viable Product - MVP of our protocol - 
+https://h4wtk-qqaaa-aaaal-adska-cai.icp0.io/
+
 Liquidi5 aims to redefine NFT DeFi lending and borrowing with ckBTC/ckEth for ICP NFTs with Liquidi5 Protocol.
 
