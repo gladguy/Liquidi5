@@ -1,7 +1,4 @@
-import { Actor, HttpAgent } from "@dfinity/agent";
 import { Principal } from "@dfinity/principal";
-import { getCrc32 } from "@dfinity/principal/lib/esm/utils/getCrc";
-import { sha224 } from "@dfinity/principal/lib/esm/utils/sha224";
 import {
   Badge,
   Col,
@@ -17,15 +14,12 @@ import {
 } from "antd";
 import axios from "axios";
 import React, { useEffect, useState } from "react";
-import { BiInfoSquare } from "react-icons/bi";
 import { FaCaretDown, FaRegSmileWink } from "react-icons/fa";
 import { FcApproval } from "react-icons/fc";
-import { GoInfo } from "react-icons/go";
 import { HiOutlineInformationCircle } from "react-icons/hi2";
 import { ImSad } from "react-icons/im";
 import { LiaConnectdevelop } from "react-icons/lia";
 import { MdContentCopy, MdLockClock } from "react-icons/md";
-import { PiMagicWandFill } from "react-icons/pi";
 import { Bars } from "react-loading-icons";
 import ThreeDots from "react-loading-icons/dist/esm/components/three-dots";
 import Bitcoin from "../../assets/coin_logo/ckbtc.png";
@@ -35,14 +29,20 @@ import ModalDisplay from "../../component/modal";
 import Notify from "../../component/notification";
 import TableComponent from "../../component/table";
 import { propsContainer } from "../../container/props-container";
+import { nftCommonIdlFactory } from "../../nft_canister";
 import { setLoading } from "../../redux/slice/constant";
 import {
+  ApprovedCollections,
   Capitalaize,
   DateTimeConverter,
+  agentCreator,
   constructUser,
   daysCalculator,
   decodeTokenId,
+  getSubAccountArray,
+  principalToAccountIdentifier,
   sliceAddress,
+  tellMeCanisterName,
   tokenIdentifier,
 } from "../../utils/common";
 
@@ -55,15 +55,13 @@ const Dashboard = (props) => {
   const icpvalue = reduxState.constant.icpvalue;
   const icp_agent = reduxState.constant.icpAgent;
   let plugAddress = walletState.plug.principalId;
+  let userAccountId = walletState.plug.principalId;
 
   const { Title, Text } = Typography;
 
   // USE STATE
   const [lendData, setLendData] = useState([]);
-  const [allActiveLendIds, setAllActiveLendIds] = useState(null);
-  const [allActiveLendData, setAllActiveLendData] = useState([]);
   const [approvedAssets, setApprovedAssets] = useState(null);
-
   const [userActiveLendData, setUserActiveLendData] = useState(null);
 
   const [copy, setCopy] = useState("Copy");
@@ -82,10 +80,7 @@ const Dashboard = (props) => {
   });
   const [supplyItems, setSupplyItems] = useState(null);
   const [assetSupplies, setAssetSupplies] = useState(null);
-
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [lendCardDetails, setCardDetails] = useState({});
-  const [isLendModalOpen, setIsLendModalOpen] = useState(false);
   const [handleSupplyTransferModal, setHandleSupplyTransferModal] =
     useState(false);
   const [lendTransferModal, setLendTransferModal] = useState(false);
@@ -97,7 +92,6 @@ const Dashboard = (props) => {
     floorPrice: 0,
   });
   const [lendTransferData, setLendTransferData] = useState({});
-
   const [repayCanisterData, setRepayCanisterData] = useState({
     tokenIndex: 0,
     repayment_amount: 0,
@@ -106,133 +100,18 @@ const Dashboard = (props) => {
     obj: {},
   });
 
-  const [screenDimensions, setScreenDimensions] = React.useState({
-    width: window.screen.width,
-    height: window.screen.height,
-  });
-
   const [askIds, setAskIds] = useState([]);
   const [borrowedAssetIds, setBorrowedAssetIds] = useState(null);
-  const [userPaymentIds, setUserPaymentIds] = useState([]);
 
   const BTC_ZERO = process.env.REACT_APP_BTC_ZERO;
-  const CONTENT_API = process.env.REACT_APP_ORDINALS_CONTENT_API;
   const ICP_CANISTER = process.env.REACT_APP_ICP_CANISTER_ID;
 
   // COMPONENTS & FUNCTIONS
-
-  const getScreenDimensions = (e) => {
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    setScreenDimensions({ width, height });
-  };
-
-  const apiFactory = ({ IDL }) => {
-    const TokenIndex = IDL.Nat32;
-    const AccountIdentifier__1 = IDL.Text;
-    const TokenIdentifier = IDL.Text;
-    const AccountIdentifier = IDL.Text;
-    const Memo = IDL.Vec(IDL.Nat8);
-    const SubAccount = IDL.Vec(IDL.Nat8);
-    const Balance = IDL.Nat;
-
-    const User = IDL.Variant({
-      principal: IDL.Principal,
-      address: AccountIdentifier,
-    });
-
-    const TransferRequest = IDL.Record({
-      to: User,
-      token: TokenIdentifier,
-      notify: IDL.Bool,
-      from: User,
-      memo: Memo,
-      subaccount: IDL.Opt(SubAccount),
-      amount: Balance,
-    });
-
-    const TransferResponse = IDL.Variant({
-      ok: Balance,
-      err: IDL.Variant({
-        CannotNotify: AccountIdentifier,
-        InsufficientBalance: IDL.Null,
-        InvalidToken: TokenIdentifier,
-        Rejected: IDL.Null,
-        Unauthorized: AccountIdentifier,
-        Other: IDL.Text,
-      }),
-    });
-
-    const CommonError = IDL.Variant({
-      InvalidToken: TokenIdentifier,
-      Other: IDL.Text,
-    });
-
-    const Result_1 = IDL.Variant({
-      ok: IDL.Vec(TokenIndex),
-      err: CommonError,
-    });
-
-    return IDL.Service({
-      tokens: IDL.Func([AccountIdentifier__1], [Result_1], ["query"]),
-      stats: IDL.Func(
-        [],
-        [IDL.Nat64, IDL.Nat64, IDL.Nat64, IDL.Nat64, IDL.Nat, IDL.Nat, IDL.Nat],
-        ["query"]
-      ),
-      transfer: IDL.Func([TransferRequest], [TransferResponse], []),
-    });
-  };
-
-  const principalToAccountIdentifier = (p, s) => {
-    const padding = Buffer("\x0Aaccount-id");
-    const array = new Uint8Array([
-      ...padding,
-      ...Principal.fromText(p).toUint8Array(),
-      ...getSubAccountArray(s),
-    ]);
-    const hash = new sha224(array);
-    const checksum = to32bits(getCrc32(hash));
-    const array2 = new Uint8Array([...checksum, ...hash]);
-    return toHexString(array2);
-  };
-  /***************************************************************************/
-
-  const getSubAccountArray = (s) => {
-    if (Array.isArray(s)) {
-      return s.concat(Array(32 - s.length).fill(0));
-    } else {
-      //32 bit number only
-      return Array(28)
-        .fill(0)
-        .concat(to32bits(s ? s : 0));
-    }
-  };
-  /***************************************************************************/
-
-  const toHexString = (byteArray) => {
-    return Array.from(byteArray, function (byte) {
-      return ("0" + (byte & 0xff).toString(16)).slice(-2);
-    }).join("");
-  };
-  /***************************************************************************/
-  const to32bits = (num) => {
-    let b = new ArrayBuffer(4);
-    new DataView(b).setUint32(0, num);
-    return Array.from(new Uint8Array(b));
-  };
-  /***************************************************************************/
-
-  const userAccountId = plugAddress
-    ? principalToAccountIdentifier(plugAddress, 0)
-    : "";
-
   const handleOk = () => {
     setIsModalOpen(false);
     setHandleSupplyTransferModal(false);
     setLendTransferModal(false);
     setRepayCanisterModal(false);
-    setIsLendModalOpen(false);
   };
 
   const handleCancel = () => {
@@ -240,7 +119,6 @@ const Dashboard = (props) => {
     setHandleSupplyTransferModal(false);
     setLendTransferModal(false);
     setRepayCanisterModal(false);
-    setIsLendModalOpen(false);
   };
 
   const options = [
@@ -348,7 +226,7 @@ const Dashboard = (props) => {
   const handleSupplyAssetTransfer = async () => {
     setLoadingState((prev) => ({ ...prev, isSupplyAsset: true }));
     const API = await window.ic?.plug.createActor({
-      interfaceFactory: apiFactory,
+      interfaceFactory: nftCommonIdlFactory,
       canisterId: supplyTransferData.canisterId,
     });
 
@@ -428,10 +306,7 @@ const Dashboard = (props) => {
           await icp_agent.setActiveLending(userAccountId, {
             nft,
             transaction_id: result.Ok.toString(),
-            // transaction_id: "111",
             borrower_account_id: lendTransferData.owner_account_id,
-            // lender_account_id:
-            //   "8a8304394098d665ae265fed99cd21e28178c227db52cda5fa58af84c88fc036", // Abishek's account 1 id
             lender_account_id: userAccountId,
             loan_amount: lendTransferData.actual_amount,
             repayment_amount: parseInt(lendTransferData.repayment_amount),
@@ -501,88 +376,17 @@ const Dashboard = (props) => {
     }
   };
 
-  const tellMeCanisterName = (key) => {
-    switch (key) {
-      case "oeee4-qaaaa-aaaak-qaaeq-cai":
-        return "Motoko Ghost";
-
-      case "rw7qm-eiaaa-aaaak-aaiqq-cai":
-        return "IC Kittis";
-
-      case "skjpp-haaaa-aaaae-qac7q-cai":
-        return "Pine Apple";
-
-      case "bzsui-sqaaa-aaaah-qce2a-cai":
-        return "Poked Bots";
-
-      case "s36wu-5qaaa-aaaah-qcyzq-cai":
-        return "Boxy";
-
-      case "cchps-gaaaa-aaaak-qasaa-cai":
-        return "Boxy Girl";
-
-      case "h4gro-4aaaa-aaaag-qczsq-cai":
-        return "Good Guy";
-
-      default:
-        return "";
-    }
-  };
-
-  const ApprovedCollections = [
-    {
-      collectionName: "Motoko Ghost",
-      canisterId: "oeee4-qaaaa-aaaak-qaaeq-cai",
-    },
-    {
-      collectionName: "IC Kittis",
-      canisterId: "rw7qm-eiaaa-aaaak-aaiqq-cai",
-    },
-    {
-      collectionName: "Pine Apple",
-      canisterId: "skjpp-haaaa-aaaae-qac7q-cai",
-    },
-    {
-      collectionName: "Poked Bots",
-      canisterId: "bzsui-sqaaa-aaaah-qce2a-cai",
-    },
-    {
-      collectionName: "Boxy",
-      canisterId: "s36wu-5qaaa-aaaah-qcyzq-cai",
-    },
-    {
-      collectionName: "Boxy Girl",
-      canisterId: "cchps-gaaaa-aaaak-qasaa-cai",
-    },
-    {
-      collectionName: "Good Guy",
-      canisterId: "h4gro-4aaaa-aaaag-qczsq-cai",
-    },
-  ];
-
-  const agentCreator = (apiFactory, canisterId) => {
-    const agent = new HttpAgent({
-      host: process.env.REACT_APP_HTTP_AGENT_ACTOR_HOST,
-    });
-    const API = Actor.createActor(apiFactory, {
-      agent,
-      canisterId,
-    });
-    return API;
-  };
-
   const fetchUserAssets = async () => {
     try {
       const principalId = plugAddress;
-      // "ewucp-gu26s-z4nfe-ifqts-n4ncc-wplay-muqhg-gaqkp-f7t7p-yhhyc-qqe";
-      // "3fz5m-ngf2v-kyozv-wsvxn-3duso-g6avx-nufx7-jbbqe-mrgzn-lavn3-sae";
+
       const accountId = principalToAccountIdentifier(principalId, 0);
       setLoadingState((prev) => ({ ...prev, isTokenData: true }));
 
       const tokens = ApprovedCollections.map(async (canister) => {
         const { canisterId, collectionName } = canister;
 
-        const API = agentCreator(apiFactory, canisterId);
+        const API = agentCreator(nftCommonIdlFactory, canisterId);
 
         return new Promise(async (res, rej) => {
           try {
@@ -636,15 +440,7 @@ const Dashboard = (props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plugAddress, icp_agent]);
 
-  // USeEFFECT DATA FETCHING ---------------------------------------------------
-
-  useEffect(() => {
-    window.addEventListener("resize", getScreenDimensions);
-
-    return () => {
-      window.removeEventListener("resize", getScreenDimensions);
-    };
-  });
+  // UseEFFECT DATA FETCHING ---------------------------------------------------
 
   const getLendData = async () => {
     try {
@@ -665,10 +461,7 @@ const Dashboard = (props) => {
       const lendActiveIds = getActiveLendReq.map(
         (array) => decodeTokenId(array[1]).index
       );
-      setAllActiveLendIds(lendActiveIds);
-      setAllActiveLendData(getActiveLendReq);
 
-      // Fetching all asked request for lending
       const getLoanReq = await icp_agent.getAllAskRequests();
 
       // Filtering assets which are already lended by any user and we hide the assets for user.
@@ -688,14 +481,12 @@ const Dashboard = (props) => {
             obj.canister
           ).toString()}.raw.icp0.io/?type=thumbnail&tokenid=${obj.token_hash}`;
 
-          const API = agentCreator(apiFactory, obj.canister);
+          const API = agentCreator(nftCommonIdlFactory, obj.canister);
           const floorPrice = await API.stats();
 
           try {
-            // const response = await fetchImg(url);
             res({
               ...obj,
-              // render: response,
               url,
               floorPrice,
             });
@@ -757,7 +548,6 @@ const Dashboard = (props) => {
       });
       setAssetSupplies(null);
       setBorrowedAssetIds(null);
-      setUserPaymentIds([]);
     }
   }, [activeWallet]);
 
@@ -770,6 +560,8 @@ const Dashboard = (props) => {
       title: "Asset",
       align: "center",
       dataIndex: "asset",
+      defaultSortOrder: "ascend",
+      sorter: (a, b) => a.tokenMeta.index - b.tokenMeta.index,
       render: (_, obj) => {
         const { index } = obj.tokenMeta;
         const lendData = borrowedAssetIds[index];
@@ -827,7 +619,7 @@ const Dashboard = (props) => {
       },
     },
     {
-      key: "ActionButtons",
+      key: "Action Buttons",
       title: " ",
       width: "25%",
       align: "center",
@@ -868,7 +660,6 @@ const Dashboard = (props) => {
                           Notify("success", "Pause successful!");
                         }
                       } else {
-                        // setAsk goes here
                         const NFT_details = {
                           token_id: Number(index),
                           mime_type: "img/jpg",
@@ -978,7 +769,9 @@ const Dashboard = (props) => {
                 }}
               >
                 <CustomButton
-                  disabled={Number(lendData?.nft?.token_id)}
+                  disabled={Number(
+                    lendData?.nft?.token_id ? lendData?.nft?.token_id : 0
+                  )}
                   block
                   className={"font-weight-600 letter-spacing-small"}
                   title="Withdraw"
@@ -1000,7 +793,9 @@ const Dashboard = (props) => {
       title: "Asset",
       align: "center",
       dataIndex: "asset",
-      render: (text, obj) => {
+      defaultSortOrder: "ascend",
+      sorter: (a, b) => a.id - b.id,
+      render: (_, obj) => {
         return (
           <>
             <Flex gap={5} vertical align="center">
@@ -1022,15 +817,18 @@ const Dashboard = (props) => {
       title: "Floor price",
       align: "center",
       dataIndex: "value",
+      sorter: (a, b) =>
+        a.floorPrice[3] > b.floorPrice[3] ||
+        -(a.floorPrice[3] < b.floorPrice[3]),
       render: (_, obj) => {
         return (
           <>
             {obj.floorPrice ? (
               <Flex vertical align="center">
-                <span className="text-color-two font-small letter-spacing-small">
-                  ∞ {Number(obj.floorPrice[3]) / BTC_ZERO}
+                <span className="text-color-one font-small letter-spacing-small">
+                  ₿ {Number(obj.floorPrice[3]) / BTC_ZERO}
                 </span>
-                <span className="text-color-one font-xsmall letter-spacing-small">
+                <span className="text-color-two font-xsmall letter-spacing-small">
                   ${" "}
                   {((Number(obj.floorPrice[3]) / BTC_ZERO) * icpvalue).toFixed(
                     2
@@ -1168,7 +966,7 @@ const Dashboard = (props) => {
     },
     {
       key: "repayment",
-      title: "Due at",
+      title: "Due on",
       align: "center",
       dataIndex: "apy",
       render: (_, obj) => {
@@ -1243,25 +1041,28 @@ const Dashboard = (props) => {
         );
         return (
           <Flex gap={10} justify="center">
-            <>
-              <CustomButton
-                block
-                className={
-                  "dashboardButtons-grey font-weight-600 letter-spacing-small"
-                }
-                title="Lend"
-                size="middle"
-                onClick={() => {
-                  setLendTransferModal(true);
-                  setLendTransferData({
-                    halfFloor,
-                    actual_amount,
-                    repayment_amount,
-                    ...obj,
-                  });
-                }}
-              />
-            </>{" "}
+            {askIds.includes(Number(obj.token_id)) ? (
+              <>
+                <CustomButton
+                  className={
+                    "dashboardButtons-grey font-weight-600 letter-spacing-small"
+                  }
+                  title="Lend"
+                  size="middle"
+                  onClick={() => {
+                    setLendTransferModal(true);
+                    setLendTransferData({
+                      halfFloor,
+                      actual_amount,
+                      repayment_amount,
+                      ...obj,
+                    });
+                  }}
+                />
+              </>
+            ) : (
+              "---"
+            )}
           </Flex>
         );
       },
@@ -1432,7 +1233,6 @@ const Dashboard = (props) => {
           rowKey={(e) => `${e?.inscriptionid}-${e?.mime_type}`}
           tableColumns={assetsToLendTableColumns}
           tableData={lendData}
-          // tableData={assetSupplies}
           pagination={{ pageSize: 5 }}
         />
       ),
@@ -1441,116 +1241,126 @@ const Dashboard = (props) => {
 
   return (
     <>
-      <Row justify={"space-between"} align={"middle"}>
-        <Col>
-          <Title level={2} className="gradient-text-one">
-            Dashboard
-          </Title>
-        </Col>
-      </Row>
       {walletState.active?.length > 0 ? (
-        <Row justify={"space-between"} className="mt-30" gutter={32}>
-          <Col xl={12}>
-            <Row>
-              <Col xl={24}>
-                <Collapse
-                  size="large"
-                  bordered={false}
-                  defaultActiveKey={["supply-1", "supply-2"]}
-                  expandIcon={({ isActive }) => (
-                    <FaCaretDown
-                      color={isActive ? "white" : "#c572ef"}
-                      size={25}
-                      style={{
-                        transform: isActive ? "" : "rotate(-90deg)",
-                        transition: "0.5s ease",
-                      }}
-                    />
-                  )}
-                  items={YourSuppliesItems}
-                />
-              </Col>
-            </Row>
+        <>
+          <Row justify={"space-between"} align={"middle"}>
+            <Col>
+              <Title level={2} className="gradient-text-one">
+                Dashboard
+              </Title>
+            </Col>
+          </Row>
+          <Row justify={"space-between"} className="mt-15" gutter={32}>
+            <Col xl={12} sm={24}>
+              <Row>
+                <Col sm={24}>
+                  <Collapse
+                    size="large"
+                    bordered={false}
+                    defaultActiveKey={["supply-1", "supply-2"]}
+                    expandIcon={({ isActive }) => (
+                      <FaCaretDown
+                        color={isActive ? "white" : "#5aa39f"}
+                        size={25}
+                        style={{
+                          transform: isActive ? "" : "rotate(-90deg)",
+                          transition: "0.5s ease",
+                        }}
+                      />
+                    )}
+                    items={YourSuppliesItems}
+                  />
+                </Col>
+              </Row>
 
-            <Row className="mt-30 m-bottom">
-              <Col xl={24}>
-                <Collapse
-                  size="large"
-                  bordered={false}
-                  defaultActiveKey={["asset-to-supply-1", "asset-to-supply-2"]}
-                  expandIcon={({ isActive }) => (
-                    <FaCaretDown
-                      color={isActive ? "white" : "#c572ef"}
-                      size={25}
-                      style={{
-                        transform: isActive ? "" : "rotate(-90deg)",
-                        transition: "0.5s ease",
-                      }}
-                    />
-                  )}
-                  items={assetsToSupplyItems}
-                />
-              </Col>
-            </Row>
-          </Col>
+              <Row className="mt-30 m-bottom">
+                <Col sm={24}>
+                  <Collapse
+                    size="large"
+                    bordered={false}
+                    defaultActiveKey={[
+                      "asset-to-supply-1",
+                      "asset-to-supply-2",
+                    ]}
+                    expandIcon={({ isActive }) => (
+                      <FaCaretDown
+                        color={isActive ? "white" : "#5aa39f"}
+                        size={25}
+                        style={{
+                          transform: isActive ? "" : "rotate(-90deg)",
+                          transition: "0.5s ease",
+                        }}
+                      />
+                    )}
+                    items={assetsToSupplyItems}
+                  />
+                </Col>
+              </Row>
+            </Col>
 
-          <Col xl={12}>
-            <Row>
-              <Col xl={24}>
-                <Collapse
-                  size="large"
-                  bordered={false}
-                  defaultActiveKey={["lend-1"]}
-                  expandIcon={({ isActive }) => (
-                    <FaCaretDown
-                      color={isActive ? "white" : "#c572ef"}
-                      size={25}
-                      style={{
-                        transform: isActive ? "" : "rotate(-90deg)",
-                        transition: "0.5s ease",
-                      }}
-                    />
-                  )}
-                  items={yourLendsItems}
-                />
-              </Col>
-            </Row>
+            <Col xl={12} sm={24}>
+              <Row>
+                <Col sm={24}>
+                  <Collapse
+                    size="large"
+                    bordered={false}
+                    defaultActiveKey={["lend-1"]}
+                    expandIcon={({ isActive }) => (
+                      <FaCaretDown
+                        color={isActive ? "white" : "#5aa39f"}
+                        size={25}
+                        style={{
+                          transform: isActive ? "" : "rotate(-90deg)",
+                          transition: "0.5s ease",
+                        }}
+                      />
+                    )}
+                    items={yourLendsItems}
+                  />
+                </Col>
+              </Row>
 
-            <Row className="mt-30 m-bottom">
-              <Col xl={24}>
-                <Collapse
-                  size="large"
-                  bordered={false}
-                  defaultActiveKey={["asset-to-lend-1"]}
-                  expandIcon={({ isActive }) => (
-                    <FaCaretDown
-                      color={isActive ? "white" : "#c572ef"}
-                      size={25}
-                      style={{
-                        transform: isActive ? "" : "rotate(-90deg)",
-                        transition: "0.5s ease",
-                      }}
-                    />
-                  )}
-                  items={assetsToLendItems}
-                />
-              </Col>
-            </Row>
-          </Col>
-        </Row>
+              <Row className="mt-30 m-bottom">
+                <Col sm={24}>
+                  <Collapse
+                    size="large"
+                    bordered={false}
+                    defaultActiveKey={["asset-to-lend-1"]}
+                    expandIcon={({ isActive }) => (
+                      <FaCaretDown
+                        color={isActive ? "white" : "#5aa39f"}
+                        size={25}
+                        style={{
+                          transform: isActive ? "" : "rotate(-90deg)",
+                          transition: "0.5s ease",
+                        }}
+                      />
+                    )}
+                    items={assetsToLendItems}
+                  />
+                </Col>
+              </Row>
+            </Col>
+          </Row>
+        </>
       ) : (
         <>
-          <Row justify={"center"} className="mt-70">
-            <LiaConnectdevelop color="violet" className="egg" size={150} />
+          <Row justify={"center"} className="mt-150">
+            <LiaConnectdevelop
+              color="violet"
+              style={{ borderRadius: "50%" }}
+              className="egg"
+              size={150}
+            />
           </Row>
           <Row justify={"center"}>
             <Text className="text-color-one font-large font-weight-600">
-              Please connect your wallet
+              Connect your wallet!
             </Text>
           </Row>
           <Row justify={"center"}>
             <Text className="text-color-two font-small mt">
-              Please connect your wallet to see your supplies, borrowings, and
+              Please connect the wallet to see your supplies, borrowings, and
               open positions.
             </Text>
           </Row>
@@ -1572,7 +1382,12 @@ const Dashboard = (props) => {
           <Text className="text-color-two font-small iconalignment">
             Amount <HiOutlineInformationCircle />
           </Text>
-          <Input readOnly style={{ fontSize: "20px" }} value={1} />
+          <Input
+            readOnly
+            className="inputStyle"
+            style={{ fontSize: "20px" }}
+            value={1}
+          />
         </Flex>
 
         <Row className="mt-15">
@@ -1581,7 +1396,7 @@ const Dashboard = (props) => {
           </Text>
         </Row>
 
-        <Flex vertical className="border-color">
+        <Flex vertical className="card-box">
           <Row justify={"space-between"}>
             <Col>
               <Text className="text-color-one font-small">
@@ -1687,10 +1502,10 @@ const Dashboard = (props) => {
           </Text>
         </Row>
 
-        <Flex vertical className="border-color">
+        <Flex vertical className="card-box">
           <Row justify={"space-between"}>
             <Col>
-              <Text className="text-color-one font-small">Due at</Text>
+              <Text className="text-color-one font-small">Due on</Text>
             </Col>
             <Col>
               <Text className="text-color-one font-small">
@@ -1757,6 +1572,7 @@ const Dashboard = (props) => {
         </>
       </ModalDisplay>
 
+      {/* Repayment modal C1 */}
       <ModalDisplay
         title={
           <Row className="black-bg white-color font-large">Repay ckBTC</Row>
@@ -1800,10 +1616,10 @@ const Dashboard = (props) => {
           </Text>
         </Row>
 
-        <Flex vertical className="border-color">
+        <Flex vertical className="card-box">
           <Row justify={"space-between"}>
             <Col>
-              <Text className="text-color-one font-small">Due at</Text>
+              <Text className="text-color-one font-small">Due on</Text>
             </Col>
             <Col>
               <Text className="text-color-one font-small">
@@ -1882,140 +1698,9 @@ const Dashboard = (props) => {
         </>
       </ModalDisplay>
 
+      {/* Displaying asset details */}
       <ModalDisplay
-        width={
-          screenDimensions.width >= 768
-            ? "50%"
-            : screenDimensions.width >= 375 && screenDimensions.width < 768
-            ? "80%"
-            : "90%"
-        }
-        open={isLendModalOpen}
-        onOk={handleOk}
-        onCancel={handleCancel}
-        footer={""}
-      >
-        <Row justify={"space-between"} className="mt-15">
-          <Col className="m-top-bottom" xs={24} md={24} lg={24} xl={11}>
-            <Row
-              justify={{
-                xs: "center",
-                md: "center",
-                xl: "center",
-                sm: "center",
-              }}
-            >
-              <Col className="details-bg card" style={{ padding: "15px" }}>
-                {lendCardDetails?.mimeType &&
-                  (lendCardDetails?.mimeType === "text/html" ? (
-                    <iframe
-                      title="lend_image"
-                      height={300}
-                      src={`${CONTENT_API}/${lendCardDetails?.id}`}
-                    />
-                  ) : (
-                    <Col
-                      className="m-top-bottom details-bg card"
-                      style={{ padding: "15px" }}
-                    >
-                      <img
-                        src={`${CONTENT_API}/${lendCardDetails?.id}`}
-                        alt={`modal_lend_image`}
-                        width={
-                          screenDimensions.width >= 1200 ||
-                          screenDimensions.width < 425
-                            ? 250
-                            : 300
-                        }
-                        className="cardrelative border-radius-30"
-                      />
-                    </Col>
-                  ))}
-              </Col>
-            </Row>
-          </Col>
-          <Col
-            className="m-top-bottom details-bg card"
-            xs={24}
-            md={24}
-            lg={24}
-            xl={11}
-          >
-            <Row justify={"space-around"}>
-              <Col>
-                <Row className="font-size-20 text-color-two ">Inscription</Row>
-                <Row className="font-size-20 text-color-two mt">
-                  Loan Amount
-                </Row>
-                <Row className="font-size-20 text-color-two mt">Loan Due</Row>
-                <Row className="font-size-20 text-color-two mt">
-                  Interest Rate
-                </Row>
-                <Row className="font-size-20 text-color-two mt">
-                  Lender Profit
-                </Row>
-                <Row className="font-size-20 text-color-two mt">
-                  Platform fee
-                </Row>
-                <Row className="font-size-20 text-color-two mt">Repayment</Row>
-              </Col>
-              <Col>
-                <Row className="font-size-20 text-color-one ">
-                  {lendCardDetails.inscriptionNumber}
-                </Row>
-                <Row className="font-size-20 text-color-one mt iconalignment">
-                  {lendCardDetails.loanAmount}
-                  <img src={Bitcoin} alt="noimage" width="30px" />
-                </Row>
-                <Row className="font-size-20 text-color-one mt">
-                  {daysCalculator().date_time}
-                </Row>
-                <Row className="font-size-20 text-color-one mt">5% APR</Row>
-                <Row className="font-size-20 text-color-one mt iconalignment">
-                  {Number(
-                    lendCardDetails.repayment_amount -
-                      lendCardDetails.loanAmount
-                  ).toFixed(9)}
-                  <img src={Bitcoin} alt="noimage" width="30px" />
-                </Row>
-                <Row className="font-size-20 text-color-one mt iconalignment">
-                  1 %
-                  <img src={Bitcoin} alt="noimage" width="30px" />
-                </Row>
-                <Row className="font-size-20 text-color-one mt iconalignment">
-                  {lendCardDetails.repayment_amount}
-                  <img src={Bitcoin} alt="noimage" width="30px" />
-                </Row>
-              </Col>
-            </Row>
-          </Col>
-        </Row>
-        <Row className="m-top-bottom" justify={"space-between"}>
-          <Col
-            xs={24}
-            className="text-align text-color-one m-top-bottom font-medium "
-          >
-            <GoInfo /> IF THE BORROWER DOES NOT REPAY, YOU'LL GET THEIR
-            COLLATERAL.
-          </Col>
-          <Col className="lend-button text-color-one m-top-bottom pointer font-size-20 iconalignment">
-            Magic Eden <PiMagicWandFill color="violet" />
-          </Col>
-        </Row>
-
-        <Row className="m-top-bottom" justify={"end"}>
-          <Col>
-            <CustomButton
-              onClick={handleCancel}
-              className="button-css font-size-20 cancelButton "
-              title={"Close"}
-            />
-          </Col>
-        </Row>
-      </ModalDisplay>
-
-      <ModalDisplay
-        width={"50%"}
+        width={"45%"}
         title={
           <Row className="black-bg white-color font-large letter-spacing-small">
             Details
@@ -2039,7 +1724,7 @@ const Dashboard = (props) => {
                   <>
                     <Row>
                       <img
-                        src={supplyItems.url}
+                        src={`https://${supplyItems.canisterId}.raw.icp0.io/?type=thumbnail&tokenid=${supplyItems.tokenId}`}
                         alt={`${supplyItems?.id}-borrow_image`}
                         className="border-radius-30"
                         width={125}
@@ -2116,7 +1801,7 @@ const Dashboard = (props) => {
             </Row>
 
             <Row className="mt-30" justify={"space-between"}>
-              <Flex vertical className="borrowDataStyle">
+              <Flex vertical className="cardStyle">
                 <Text className="text-color-two font-small">
                   Collection Name
                 </Text>
@@ -2125,7 +1810,7 @@ const Dashboard = (props) => {
                   {supplyItems?.collectionName}
                 </Text>
               </Flex>
-              <Flex vertical className="borrowDataStyle">
+              <Flex vertical className="cardStyle">
                 <Text className="text-color-two font-small">Canister ID</Text>
 
                 <Text className="text-color-one font-small font-weight-600">
@@ -2147,7 +1832,7 @@ const Dashboard = (props) => {
                   </Tooltip>
                 </Text>
               </Flex>
-              <Flex vertical className="borrowDataStyle">
+              <Flex vertical className="cardStyle">
                 <Text className="text-color-two font-small">Floor Price</Text>
 
                 <Text className="text-color-one font-small font-weight-600">

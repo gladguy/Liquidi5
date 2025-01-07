@@ -24,11 +24,50 @@
       work correctly both with client-side routing and a non-root public URL.
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
-    <title>DEFI NFT</title>
+    <title>Liquidify</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script>
+      // Check if it's a touch device
+      const isTouchDevice = "ontouchstart" in window;
+      const createCursorFollower = () => {
+        const $el = document.querySelector(".cursor-follower");
+        // Each time the mouse coordinates are updated,
+        // we need to pass the values to gsap in order
+        // to animate the element
+        window.addEventListener("mousemove", (e) => {
+          const { target, x, y } = e;
+          // Check if target is inside a link or button
+          const isTargetLinkOrBtn =
+            target?.closest("a") || target?.closest("button");
+          // GSAP config
+          gsap.to($el, {
+            x: x + 3,
+            y: y + 3,
+            duration: 0.7,
+            ease: "power4", // More easing options here: https://gsap.com/docs/v3/Eases/
+            opacity: isTargetLinkOrBtn ? 0.6 : 1,
+            transform: `scale(${isTargetLinkOrBtn ? 3 : 1})`,
+          });
+        });
+        // Hidding the cursor element when the mouse cursor
+        // is moved out of the page
+        document.addEventListener("mouseleave", (e) => {
+          gsap.to($el, {
+            duration: 0.7,
+            opacity: 0,
+          });
+        });
+      };
+      // Only invoke the function if isn't a touch device
+      if (!isTouchDevice) {
+        createCursorFollower();
+      }
+    </script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
+    <div class="cursor-follower"></div>
     <!--
       This HTML file is a template.
       If you open it directly in the browser, you will see an empty page.

@@ -1,63 +1,126 @@
-import { Actor, HttpAgent } from "@dfinity/agent";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ICP_IdlFactory } from "../../ICP_canister";
 import { ckBtcIdlFactory } from "../../ckBTC_canister";
 import Notify from "../../component/notification";
-import { headIcpApiFactory } from "../../head_icp_canister";
 import {
+  setApprovedCanisters,
+  setApprovedCanistersObjects,
   setCkBtcAgent,
-  setHeadIcpAgent,
+  setCkBtcValue,
   setIcpAgent,
   setIcpValue,
 } from "../../redux/slice/constant";
-import { setPlugPrincipalId } from "../../redux/slice/wallet";
-import { API_METHODS, apiUrl } from "../../utils/common";
+import {
+  API_METHODS,
+  agentCreator,
+  apiUrl,
+  icpCanisterId,
+} from "../../utils/common";
 
 export const propsContainer = (Component) => {
   function ComponentWithRouterProp(props) {
     const params = useParams();
+    const location = useLocation();
     const dispatch = useDispatch();
+    const navigate = useNavigate();
 
     const reduxState = useSelector((state) => state);
-    const api_agent = reduxState.constant.agent;
-    const head_Icp_api_agent = reduxState.constant.headIcpAgent;
+    const [isPlugConnected, setIsPlugConnected] = useState(false);
+
     const icp_api_agent = reduxState.constant.icpAgent;
     const ckBtcAgent = reduxState.constant.ckBtcAgent;
-    const ckBtcActorAgent = reduxState.constant.ckBtcActorAgent;
-    const ckEthAgent = reduxState.constant.ckEthAgent;
-    const ckEthActorAgent = reduxState.constant.ckEthActorAgent;
-    const withdrawAgent = reduxState.constant.withdrawAgent;
     const principalId = reduxState.wallet.plug.principalId;
-
-    const icpPrice = async () => {
-      const BtcData = await API_METHODS.get(
-        `${apiUrl.Asset_server_base_url}/api/v1/fetch/IcpPrice`
-      );
-      return BtcData;
-    };
 
     const fetchIcpLiveValue = async () => {
       try {
-        const IcpData = await icpPrice();
-        if (IcpData.data.data[0]?.length) {
-          const btcValue = IcpData.data.data[0].flat();
-          dispatch(setIcpValue(btcValue[1]));
+        let icpValue;
+        const icpData = await API_METHODS.get(
+          `${process.env.REACT_APP_COINGECKO_API}?ids=${process.env.REACT_APP_TICKER}&vs_currencies=usd`
+        );
+
+        if (icpData.data["internet-computer"]?.usd) {
+          icpValue = icpData.data["internet-computer"]?.usd;
+          dispatch(setIcpValue(icpValue));
         } else {
-          await fetchIcpLiveValue();
+          fetchIcpLiveValue();
         }
       } catch (error) {
-        // console.log("props container", error);
-        Notify("error", "Failed to fetch ckBtc");
+        // Notify("error", "Failed to fetch Aptos");
+      }
+    };
+
+    const fetchApprovedCollections = async () => {
+      try {
+        const API = agentCreator(ICP_IdlFactory, icpCanisterId);
+        const approvedCollections = await API.getApprovedCollections();
+
+        const collections = approvedCollections.map((data) => data[1]);
+        let obj = {};
+        approvedCollections.forEach((col) => {
+          obj = {
+            ...obj,
+            [Number(col[0])]: col[1],
+          };
+        });
+        dispatch(setApprovedCanistersObjects(obj));
+        dispatch(setApprovedCanisters(collections));
+      } catch (error) {
+        console.log("error Fetch User Assets", error);
+      }
+    };
+
+    const verifyConnection = async () => {
+      if (principalId) {
+        const connected = await window?.ic?.plug.isConnected();
+        if (!connected) {
+          Notify(
+            "warning",
+            "Please reconnect your wallet as the connection has been aborted."
+          );
+          setIsPlugConnected(false);
+          return false;
+        } else {
+          setIsPlugConnected(true);
+          return true;
+        }
+      }
+    };
+
+    const btcPrice = async () => {
+      const btcData = await API_METHODS.get(
+        `${apiUrl.Asset_server_base_url}/api/v1/fetch/chain/price/${process.env.REACT_APP_CHAIN_TICKER}`
+      );
+      return btcData;
+    };
+
+    const fetchBTCLiveValue = async () => {
+      try {
+        const BtcData = await btcPrice();
+        if (BtcData?.data.data[0]) {
+          const BtcValue = BtcData.data.data[0].current_price;
+          dispatch(setCkBtcValue(BtcValue));
+        } else {
+          // fetchBTCLiveValue();
+        }
+      } catch (error) {
+        // Notify("error", "Failed to fetch ckBtc");
       }
     };
 
     useEffect(() => {
       (async () => {
+        await fetchApprovedCollections();
+      })();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [icp_api_agent]);
+
+    useEffect(() => {
+      (async () => {
         try {
           if (window?.ic?.plug) {
-            if (!ckBtcAgent && principalId) {
+            if (!ckBtcAgent && principalId && isPlugConnected) {
               // Btc canister for transactions
               const ckBtcAgent = await window.ic?.plug.createActor({
                 canisterId: process.env.REACT_APP_BTC_CANISTER_ID,
@@ -68,38 +131,18 @@ export const propsContainer = (Component) => {
             }
           }
         } catch (error) {
-          Notify("error", error.message);
-          // console.log(error);
+          // Notify("error", error.message);
+          console.log(error);
         }
       })();
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dispatch, principalId]);
-
-    useEffect(() => {
-      (async () => {
-        try {
-          if (!head_Icp_api_agent) {
-            const lendingAgent = new HttpAgent({
-              host: process.env.REACT_APP_HTTP_AGENT_ACTOR_HOST,
-            });
-            const agent = Actor.createActor(headIcpApiFactory, {
-              agent: lendingAgent,
-              canisterId: process.env.REACT_APP_HEAD_ICP_CANISTER_ID,
-            });
-            dispatch(setHeadIcpAgent(agent));
-          }
-        } catch (error) {
-          Notify("error", error.message);
-        }
-      })();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dispatch]);
+    }, [dispatch, principalId, isPlugConnected]);
 
     useEffect(() => {
       (async () => {
         try {
           if (window?.ic?.plug) {
-            if (!icp_api_agent && principalId) {
+            if (!icp_api_agent && principalId && isPlugConnected) {
               const agent = await window.ic?.plug.createActor({
                 interfaceFactory: ICP_IdlFactory,
                 canisterId: process.env.REACT_APP_ICP_CANISTER_ID,
@@ -110,15 +153,18 @@ export const propsContainer = (Component) => {
             Notify("warning", "Install the Plug Wallet!");
           }
         } catch (error) {
-          Notify("error", error.message);
+          // Notify("error", error.message);
+          console.log(error);
         }
       })();
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dispatch, principalId]);
+    }, [dispatch, isPlugConnected, principalId]);
 
     useEffect(() => {
       // fetching ICP Value
       fetchIcpLiveValue();
+      // fetching CkBtc Value
+      fetchBTCLiveValue();
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -130,30 +176,33 @@ export const propsContainer = (Component) => {
         return () => clearInterval();
       })();
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [api_agent, dispatch]);
+    }, [dispatch]);
+
+    useEffect(() => {
+      (() => {
+        setInterval(async () => {
+          fetchBTCLiveValue();
+        }, [300000]);
+        return () => clearInterval();
+      })();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dispatch]);
 
     useEffect(() => {
       (async () => {
-        if (window.ic.plug.principalId !== principalId) {
-          window.ic.plug.principalId &&
-            principalId &&
-            dispatch(setPlugPrincipalId(window.ic.plug.principalId));
-        }
+        await verifyConnection();
       })();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [dispatch, principalId]);
 
     return (
       <Component
         {...props}
-        router={{ params }}
+        router={{ params, location, navigate }}
         redux={{ dispatch, reduxState }}
         wallet={{
-          api_agent,
           ckBtcAgent,
-          ckEthAgent,
-          withdrawAgent,
-          ckBtcActorAgent,
-          ckEthActorAgent,
+          isPlugConnected,
         }}
       />
     );

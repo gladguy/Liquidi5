@@ -10,13 +10,25 @@
 
 # production
 /build
+/home/waheed/Work/Liquidi5_Development/BackEnd/icploan_ledger/.dfx
+# Ignore all files under BackEnd/icploan_ledger/.dfx/
+BackEnd/icploan_ledger/.dfx/
+
+# Optionally, you can ignore specific file types globally if you don't want to track any .did, .most, .wasm, .d.ts, or .js files across the entire project.
+*.did
+*.most
+*.wasm
+*.d.ts
+*.js
 
 # misc
 .DS_Store
+.env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+.dfx
 
 npm-debug.log*
 yarn-debug.log*

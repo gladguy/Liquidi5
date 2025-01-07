@@ -13,6 +13,8 @@ const TableComponent = ({
   className = "",
   loading = false,
   bordered = false,
+  rowClassName = "",
+  rootClassName = "",
 }) => {
   return (
     <Table
@@ -29,6 +31,8 @@ const TableComponent = ({
       expandable={expandable}
       pagination={pagination}
       rowSelection={rowSelection}
+      rowClassName={rowClassName}
+      rootClassName={rootClassName}
     />
   );
 };

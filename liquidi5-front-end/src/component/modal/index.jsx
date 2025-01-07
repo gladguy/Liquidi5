@@ -2,28 +2,29 @@ import { Modal } from "antd";
 import React from "react";
 
 const ModalDisplay = ({
-  width,
-  title,
   open,
   onOK,
-  onCancel,
+  width,
+  title,
+  style,
   footer,
   children,
+  onCancel,
   className,
-  style,
+  destroyOnClose,
 }) => {
   return (
     <Modal
-      style={style}
       forceRender
-      // destroyOnClose
-      width={width}
       open={open}
       onOk={onOK}
-      onCancel={onCancel}
-      footer={footer}
-      className={className}
+      style={style}
+      width={width}
       title={title}
+      footer={footer}
+      onCancel={onCancel}
+      className={className}
+      destroyOnClose={destroyOnClose}
     >
       {children}
     </Modal>

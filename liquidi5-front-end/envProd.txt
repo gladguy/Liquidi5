@@ -1,0 +1,17 @@
+REACT_APP_HTTP_AGENT_ACTOR_HOST="https://icp-api.io"
+REACT_APP_BTC_CANISTER_ID = "mxzaz-hqaaa-aaaar-qaada-cai"
+REACT_APP_ICP_CANISTER_ID = "ibuvb-6aaaa-aaaam-ab6ea-cai"
+REACT_APP_ICP_AC_ID = "c71642ec597853749485ae1a07e34eba58358973d532e2f1ad5adb91bcf12293"
+REACT_APP_ASSET_SERVER = "https://ordinalsheight.com"
+REACT_APP_COINGECKO_API = "https://api.coingecko.com/api/v3/simple/price"
+REACT_APP_TICKER = "internet-computer"
+REACT_APP_BTC_ZERO = 100000000
+
+# Social Media
+REACT_APP_MAILTO="mailto:liquidify@gmail.com"
+REACT_APP_TELEGRAM="https://t.me/+EPq5wDlCFuk0Nzc9"
+REACT_APP_TWITTER="https://x.com/liquidify_us"
+REACT_APP_DISCORD="https://discord.gg/C7vbVYBx2p"
+
+STAGING_FRONT_END = "aqerx-6aaaa-aaaal-ajdoq-cai"
+FRONT_END = "h4wtk-qqaaa-aaaal-adska-cai"

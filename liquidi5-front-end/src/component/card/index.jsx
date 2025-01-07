@@ -1,6 +1,6 @@
 import { Card, Col, ConfigProvider, Row } from "antd";
 
-const CardDisplay = ({
+export const CardDisplay = ({
   hoverable,
   className,
   bordered,
@@ -24,8 +24,6 @@ const CardDisplay = ({
     </Card>
   );
 };
-
-export default CardDisplay;
 
 export function StatCard({ icon, value, label }) {
   return (
