@@ -1,5 +1,8 @@
 {
   "icploan_ledger_backend": {
     "ic": "ibuvb-6aaaa-aaaam-ab6ea-cai"
+  },
+  "icploan_stage": {
+    "ic": "qv72z-diaaa-aaaam-adccq-cai"
   }
 }

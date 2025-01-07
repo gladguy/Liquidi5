@@ -1,0 +1,22 @@
+    public func resetData() : async Bool {
+
+        _ActiveLendID := [];
+        _ActiveLending := [];
+        _activeLendersData := [];
+        _assetDetails := [];
+        _borrowRequest := [];
+        _loanOffersData := [];
+        _activeBorrowersData := [];
+
+        _ActiveLendingTable := HashMap.fromIter<Text, Nat>(_ActiveLendID.vals(), hashMapSize, Text.equal, Text.hash);
+        _ActiveLendingAssetsTable := HashMap.fromIter<Nat, Text>(_ActiveLending.vals(), hashMapSize, isEq, Nat32.fromNat);
+        _activeLendersTable := HashMap.fromIter<Text, [LentData]>(_activeLendersData.vals(), hashMapSize, Text.equal, Text.hash);
+        _assetDetailsTable := HashMap.fromIter<Text, BorrowRequest>(_assetDetails.vals(), hashMapSize, Text.equal, Text.hash);
+        _borrowRequestTable := HashMap.fromIter<Text, [BorrowRequest]>(_borrowRequest.vals(), hashMapSize, Text.equal, Text.hash);
+        _loanOffersTable := HashMap.fromIter<Nat, [CollectionOffers]>(_loanOffersData.vals(), hashMapSize, isEq, Nat32.fromNat);
+        _activeBorrowersTable := HashMap.fromIter<Text, [LentData]>(_activeBorrowersData.vals(), hashMapSize, Text.equal, Text.hash);
+
+        _activeLendingCount := 0;
+        return true;
+    };
+    /*------------------------------------------------------------*/

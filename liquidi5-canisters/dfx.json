@@ -3,6 +3,10 @@
     "icploan_ledger_backend": {
       "main": "src/icploan_ledger_backend/main.mo",
       "type": "motoko"
+    },
+    "icploan_stage": {
+      "main": "src/icploan_ledger_backend/main_stage.mo",
+      "type": "motoko"
     }
   },
   "defaults": {

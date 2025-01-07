@@ -74,23 +74,25 @@ module Types {
     public type NFT_Information = {
         canister : Principal;
         collection_name: Text;
-        token_id : Nat;
+        token_hash : Text;
+        token_number: Nat;
         owner_account_id : Text;
         owner_principal : Principal;
-        token_hash: Text;
         mime_type : Text;
     };
 
     //Lending Data
-    public type LendData = {
+    public type LentData = {
         nft : NFT_Information;
         transaction_id: Text;
-        borrower_account_id: Text;      // Who ever borrowing ckBTC
+        borrower_account_id: Text;     // Who ever borrowing ckBTC
         lender_account_id: Text;       // Who ever lending ckBTC
         loan_amount : Nat;
         repayment_amount: Nat;
-        timestamp : Nat64;
+        timestamp : Int;
+        offerID : Nat;
     };
+
 
 
     //Loan Request
@@ -159,7 +161,7 @@ module Types {
         repayment_transaction_id: Text;
         repayment_amount: Nat;
         timestamp : Nat64;
-        lenddata : LendData
+        lenddata : LentData
     };    
         
     //Loan Complete Details
@@ -195,9 +197,6 @@ module Types {
         loan_maturity: Time.Time;
         bitcoin_price: Float;
     };
-
- 
-
 
 
 }
