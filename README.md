@@ -21,18 +21,11 @@ Liquidi5 prioritizes simplicity and ease of use, offering:
 
 ---
 
-## 🚀 Minimum Viable Product (MVP)
-
-Experience the core functionality of Liquidi5 with our Proof of Concept (MVP):
-
-[**Liquidi5 MVP**](https://h4wtk-qqaaa-aaaal-adska-cai.icp0.io/)
-
----
 
 ## 🌍 Vision
 
 Liquidi5 Protocol aims to redefine decentralized lending and borrowing by bridging the gap between ICP NFTs and DeFi. Our goal is to provide a robust platform for:
-- Lending and borrowing with **ckBTC** and **ckETH**.
+- Lending and borrowing with **ckBTC** and in future with **ckETH**.
 - Unlocking liquidity for the ICP NFT ecosystem.
 
 Join us as we revolutionize NFT-based DeFi on the Internet Computer blockchain.
